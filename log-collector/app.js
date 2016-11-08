@@ -1,30 +1,29 @@
 
-var express = require('express')
-var bodyParser = require('body-parser')
-var app = express()
-var kafka = require('kafka-node')
-var Producer = kafka.Producer
-var client = new kafka.Client('zoo1:2181')
-var producer = new Producer(client)
+const express = require('express')
+const bodyParser = require('body-parser')
+const useragent = require('express-useragent')
+const app = express()
+const kafka = require('kafka-node')
+const Producer = kafka.Producer
+const client = new kafka.Client('zoo1:2181')
+const producer = new Producer(client)
 
 producer.on('ready', function () {
   app.use(bodyParser.json())
+  app.use(useragent.express())
 
-  app.post('/api/events', function (req, res) {
-    var payloads = [
-      {
-        topic: 'events',
-        messages: JSON.stringify(req.body),
-        partition: 0
-      }
-    ]
+  app.get('/track', function (req, res) {
+    req.query.ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress
+    req.query.useragent = req.useragent
 
-    producer.send(payloads, function (err, data) {
-      if (err) {
-        res.status(500).send(err)
-      } else {
-        res.status(200).send(err)
-      }
+    res.status(200).send(req.query)
+
+    producer.send([{
+      topic: 'events',
+      messages: JSON.stringify(req.query),
+      partition: 0
+    }], function (err, data) {
+      console.log(err || data)
     })
   })
 
